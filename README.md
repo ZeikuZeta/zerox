@@ -4,6 +4,12 @@ WORK-IN-PROGRESS / Not functionnal.
 
 ZeroX is a API First WIP multi-tenant (role per user in tenant) Backend as a Service solution based on postgreSQL, postgREST, RabbitMQ.
 
+## Runing
+
+```sh
+docker-compose --env-file env/dev.env up
+```
+
 ## Goals
 
 ### Deploy without any configuration a business agnostic back-end with multi-tenancy enabled.
