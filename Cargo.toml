@@ -1,0 +1,11 @@
+[package]
+authors = ["Antoine Favarel <zeiku@protonmail.com>"]
+edition = "2018"
+name = "zerox"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+postgrest = "1.0.0"
+tokio = {version = "0.3", features = ["full"]}
