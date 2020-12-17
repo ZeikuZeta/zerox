@@ -12,21 +12,21 @@ create type organization_role_type as enum ('viewer', 'member', 'manager', 'owne
 -- Organizations System
 --
 
-create function api.get_user_role(o_id uuid)
+create function internal.get_user_role(o_id uuid)
 returns text as $$
 declare
     a_id uuid;
-    role_type organization_role_type;
+    role_t organization_role_type;
 begin
     select id into a_id
     from api.accounts
     where role_string = current_user;
 
-    select role_type into role_type
+    select role_type into role_t
     from api.organizations_auths
     where account_id = a_id and organization_id = o_id;
 
-    return role_type;
+    return role_t;
 end;
 $$ language plpgsql;
 
@@ -38,23 +38,25 @@ create table api.organizations (
     status_type organization_status_type not null default 'active'
 );
 
+insert into api.organizations (description) values ('My Organization');
+
 alter table api.organizations enable row level security;
 
 -- Administrator can see all rows and add any rows.
 create policy zerox_all on api.organizations to zerox using (true) with check (true);
 
 -- Viewer and member of an organization can only select this organization.
-create policy viewer on api.organizations for select using (api.get_user_role(id) = 'viewer');
-create policy member on api.organizations for select using (api.get_user_role(id) = 'member');
+create policy viewer on api.organizations for select using (internal.get_user_role(id) = 'viewer');
+create policy member on api.organizations for select using (internal.get_user_role(id) = 'member');
 
 -- Manager of an organization can select and update this organization.
-create policy manager_select on api.organizations for select using (api.get_user_role(id) = 'manager');
-create policy manager_update on api.organizations for update using (api.get_user_role(id) = 'manager') with check (api.get_user_role(id) = 'manager');
+create policy manager_select on api.organizations for select using (internal.get_user_role(id) = 'manager');
+create policy manager_update on api.organizations for update using (internal.get_user_role(id) = 'manager') with check (internal.get_user_role(id) = 'manager');
 
 -- Owner of an organization can select, update and delete this organization.
-create policy owner_select on api.organizations for select using (api.get_user_role(id) = 'owner');
-create policy owner_update on api.organizations for update using (api.get_user_role(id) = 'owner') with check (api.get_user_role(id) = 'owner');
-create policy owner_delete on api.organizations for delete using (api.get_user_role(id) = 'owner');
+create policy owner_select on api.organizations for select using (internal.get_user_role(id) = 'owner');
+create policy owner_update on api.organizations for update using (internal.get_user_role(id) = 'owner') with check (internal.get_user_role(id) = 'owner');
+create policy owner_delete on api.organizations for delete using (internal.get_user_role(id) = 'owner');
 
 -- All user can insert or update only description and logo but select all field.
 grant select, insert (description, logo), update (description, logo), delete on api.organizations to PUBLIC;
@@ -81,22 +83,22 @@ alter table api.organizations_auths enable row level security;
 create policy zerox_all on api.organizations_auths to zerox using (true) with check (true);
 
 -- Viewer and member of an organization can only select auths of this organization.
-create policy viewer on api.organizations_auths for select using (api.get_user_role(organization_id) = 'viewer');
-create policy member on api.organizations_auths for select using (api.get_user_role(organization_id) = 'member');
+create policy viewer on api.organizations_auths for select using (internal.get_user_role(organization_id) = 'viewer');
+create policy member on api.organizations_auths for select using (internal.get_user_role(organization_id) = 'member');
 
 -- Manager can select, update, insert or delete (except for owner)
-create policy manager_select on api.organizations_auths for select using (api.get_user_role(organization_id) = 'manager');
-create policy manager_insert on api.organizations_auths for insert with check (api.get_user_role(organization_id) = 'manager' and role_type != 'owner');
-create policy manager_update on api.organizations_auths for update using (api.get_user_role(organization_id) = 'manager')
-    with check (api.get_user_role(organization_id) = 'manager' and role_type != 'owner');
-create policy manager_delete on api.organizations_auths for delete using (api.get_user_role(organization_id) = 'manager' and role_type != 'owner');
+create policy manager_select on api.organizations_auths for select using (internal.get_user_role(organization_id) = 'manager');
+create policy manager_insert on api.organizations_auths for insert with check (internal.get_user_role(organization_id) = 'manager' and role_type != 'owner');
+create policy manager_update on api.organizations_auths for update using (internal.get_user_role(organization_id) = 'manager')
+    with check (internal.get_user_role(organization_id) = 'manager' and role_type != 'owner');
+create policy manager_delete on api.organizations_auths for delete using (internal.get_user_role(organization_id) = 'manager' and role_type != 'owner');
 
 -- Owner can select, update, insert or delete
-create policy owner_select on api.organizations_auths for select using (api.get_user_role(organization_id) = 'owner');
-create policy owner_insert on api.organizations_auths for insert with check (api.get_user_role(organization_id) = 'owner');
-create policy owner_update on api.organizations_auths for update using (api.get_user_role(organization_id) = 'owner')
-    with check (api.get_user_role(organization_id) = 'owner');
-create policy owner_delete on api.organizations_auths for delete using (api.get_user_role(organization_id) = 'owner');
+create policy owner_select on api.organizations_auths for select using (internal.get_user_role(organization_id) = 'owner');
+create policy owner_insert on api.organizations_auths for insert with check (internal.get_user_role(organization_id) = 'owner');
+create policy owner_update on api.organizations_auths for update using (internal.get_user_role(organization_id) = 'owner')
+    with check (internal.get_user_role(organization_id) = 'owner');
+create policy owner_delete on api.organizations_auths for delete using (internal.get_user_role(organization_id) = 'owner');
 
 grant select, insert, update, delete on api.organizations_auths to PUBLIC;
 
@@ -106,7 +108,7 @@ grant select, insert, update, delete on api.organizations_auths to PUBLIC;
 --
 
 -- Create a organizations_auth 'owner' for each insert in organizations table
-create function insert_organization_owner() returns trigger as $$
+create function internal.insert_organization_owner() returns trigger as $$
 declare
     a_id uuid;
 begin
@@ -123,4 +125,4 @@ $$ language plpgsql;
 
 create trigger trigger_insert_organization_owner
     after insert on api.organizations
-    for each row execute procedure insert_organization_owner();
+    for each row execute procedure internal.insert_organization_owner();
